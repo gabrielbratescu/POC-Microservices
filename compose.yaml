@@ -1,0 +1,302 @@
+services:
+  mysql:
+    image: 'mysql:latest'
+    environment:
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE}'
+      - 'MYSQL_PASSWORD=${MYSQL_PASSWORD}'
+      - 'MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}'
+      - 'MYSQL_USER=${MYSQL_USER}'
+    ports:
+      - '3306:3306'
+    networks:
+      - micro-service-network
+
+
+  zipkin:
+    image: 'openzipkin/zipkin:latest'
+    ports:
+      - '9411:9411'
+    networks:
+      - micro-service-network
+
+  service2:
+    image: service2
+    build:
+      context: service2
+      dockerfile: Dockerfile
+    ports:
+      - '8080'
+    networks:
+      - micro-service-network
+    environment:
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE}'
+      - 'MYSQL_PASSWORD=${MYSQL_PASSWORD}'
+      - 'MYSQL_USER=${MYSQL_USER}'
+      - 'MYSQL_IP=${MYSQL_IP}'
+      - 'ZIPKIN_IP=${ZIPKIN_IP}'
+      - 'EUREKA_IP=${EUREKA_IP}'
+      - 'KAFKA_IP=${KAFKA_IP}'
+      - 'SPRINGBOOT_ADMIN_IP=${SPRINGBOOT_ADMIN_IP}'
+      - 'SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}'
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - zipkin
+      - eureka
+    labels:
+      collect_logs_with_filebeat: "true"
+      decode_log_event_to_json_object: "true"
+
+  service1:
+    image: service1
+    build:
+      context: service1
+      dockerfile: Dockerfile
+    ports:
+      - '8080'
+    networks:
+      - micro-service-network
+    environment:
+      - 'MYSQL_DATABASE=${MYSQL_DATABASE}'
+      - 'MYSQL_PASSWORD=${MYSQL_PASSWORD}'
+      - 'MYSQL_USER=${MYSQL_USER}'
+      - 'MYSQL_IP=${MYSQL_IP}'
+      - 'ZIPKIN_IP=${ZIPKIN_IP}'
+      - 'EUREKA_IP=${EUREKA_IP}'
+      - 'KAFKA_IP=${KAFKA_IP}'
+      - 'SPRINGBOOT_ADMIN_IP=${SPRINGBOOT_ADMIN_IP}'
+      - 'SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}'
+      - 'SERVICE2_LB_IP=${SERVICE2_LB_IP}'
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - zipkin
+      - eureka
+    labels:
+      collect_logs_with_filebeat: "true"
+      decode_log_event_to_json_object: "true"
+
+  spring-admin:
+    image: spring-admin
+    build:
+      context: spring-admin
+      dockerfile: Dockerfile
+    ports:
+      - '8080'
+    networks:
+      - micro-service-network
+    restart: unless-stopped
+    labels:
+      collect_logs_with_filebeat: "true"
+      decode_log_event_to_json_object: "true"
+
+
+  prometheus:
+    image: prom/prometheus:v2.37.9
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--enable-feature=exemplar-storage'
+    restart: unless-stopped
+    depends_on:
+      - eureka
+      - service2
+    ports:
+      - 9090:9090
+    networks:
+      - micro-service-network
+    labels:
+      org.label-schema.group: "monitoring"
+
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+#      - GF_SECURITY_ADMIN_USER=${ADMIN_USER}
+#      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+#      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    networks:
+      - micro-service-network
+    labels:
+      org.label-schema.group: "monitoring"
+
+  tempo:
+    container_name: tempo
+    image: grafana/tempo
+    command: ['-config.file=/etc/tempo.yml']
+    volumes:
+      - tempo:/tmp/tempo
+      - ./grafana/tempo.yml:/etc/tempo.yml:ro
+    ports:
+      - 3200:3200    # tempo
+      - 9411    # zipkin
+    networks:
+      - micro-service-network
+
+  loki:
+    container_name: loki
+    image: grafana/loki
+    command: ['-config.file=/etc/loki/local-config.yaml']
+    ports:
+      - 3100:3100
+    networks:
+      - micro-service-network
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - service2
+    ports:
+      - "80:80"
+    networks:
+      - micro-service-network
+
+  eureka:
+    image: eureka
+    build:
+      context: eureka
+      dockerfile: Dockerfile
+    environment:
+      - 'SPRINGBOOT_ADMIN_IP=${SPRINGBOOT_ADMIN_IP}'
+    ports:
+      - '8761'
+    networks:
+      - micro-service-network
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.12
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./elasticsearch-data:/usr/share/elasticsearch/data:rw
+    ports:
+      - 9200:9200
+    networks:
+      - micro-service-network
+
+  kibana:
+    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:7.17.12
+    restart: always
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200    # address of elasticsearch docker container which kibana will connect
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+    networks:
+      - micro-service-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.12
+    ports:
+      - "25826:25826"
+      - "5044:5044"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro                # Pipeline configuration
+    #command: bin/logstash-plugin install logstash-output-loki
+    restart: on-failure
+    depends_on:
+      - elasticsearch
+    networks:
+      - micro-service-network
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.17.12
+    volumes:
+      - ./filebeat/filebeat.docker.yml:/usr/share/filebeat/filebeat.yml:ro # Configuration file
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro           # Docker logs
+      - /var/log/micro:/var/log/micro:ro                                   # Application logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro                       # Additional information about containers
+      - ./filebeat/data:/usr/share/filebeat/data:rw                        # Persistence data
+    user: root                                                             # Allow access to log files and docker.sock
+    restart: on-failure
+    depends_on:
+      - logstash
+      - service2
+    networks:
+      - micro-service-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+    networks:
+      - micro-service-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - micro-service-network
+
+  maildev:
+    container_name: maildev
+    image: djfarrelly/maildev
+    extra_hosts: [ 'host.docker.internal:host-gateway' ]
+    ports:
+      - 80
+      - 25
+    networks:
+      - micro-service-network
+
+
+networks:
+  micro-service-network:
+    driver: bridge
+
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  tempo:
+    driver: local

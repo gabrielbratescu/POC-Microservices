@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: com.example
+testFramework: junit
+sourceLanguage: java
+buildTool: gradle
+features: [annotation-api, app-name, assertj, cache-caffeine, data, data-jpa, discovery-client, discovery-eureka, email-javamail, flyway, gitlab-workflow-ci, gradle, http-client, java, java-application, jdbc-hikari, jib, junit, kafka, logback, lombok, management, micrometer, micrometer-annotation, micronaut-aop, micronaut-aot, micronaut-build, mysql, openapi, properties, readme, serialization-jackson, shade, spring, spring-boot, spring-data-jpa, spring-web, swagger-ui, testcontainers, tomcat-server, tracing-opentelemetry-annotations, tracing-opentelemetry-exporter-zipkin, tracing-opentelemetry-http, tracing-opentelemetry-zipkin]
