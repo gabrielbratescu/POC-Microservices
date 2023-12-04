@@ -28,12 +28,14 @@
 
 ### How to run the project
 - Clone the repository
-- Run ./buildProject.sh in the root folder. This wiil build the frontend and backend projects
+- Install Gradle if you don't have it already
+- Run ./buildProject.sh in the root folder. This will build the frontend and backend projects.
 - Run `docker-compose up --build` in the root folder
-- Open `http://localhost:80` in your browser
-- Open `http://localhost:8080/swagger-ui.html` in your browser to see the API documentation
-- Open `http://localhost:8080/actuator` in your browser to see the API monitoring
-- Open `http://localhost:8080/admin` in your browser to see the Spring Admin
-- Open `http://localhost:8080/zipkin` in your browser to see the tracing
-- Open `http://localhost:8080/prometheus` in your browser to see the monitoring
-- Open `http://localhost:8080/grafana` in your browser to see the monitoring
+- Open `http://localhost:18080` in your browser to see the frontend
+- Open `http://localhost:8080/admin` in your browser to see the Spring Admin dashboard
+- Open `http://localhost:9411/zipkin/` in your browser to see the tracing in Zipkin
+- Open `http://localhost:9090/prometheus` in your browser to see the monitoring data in Prometheus
+- Open `http://localhost:3000/grafana` in your browser to see the dashboards in Grafana
+- Open `http://localhost:5601` in your browser to see the logs in Kibana
+- Open 'http://localhost:29092/' in a Kafka client to see the messages in Kafka 
+
