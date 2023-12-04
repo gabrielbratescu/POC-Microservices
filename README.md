@@ -28,6 +28,7 @@
 
 ### How to run the project
 - Clone the repository
+- Run ./buildProject.sh in the root folder. This wiil build the frontend and backend projects
 - Run `docker-compose up --build` in the root folder
 - Open `http://localhost:80` in your browser
 - Open `http://localhost:8080/swagger-ui.html` in your browser to see the API documentation
