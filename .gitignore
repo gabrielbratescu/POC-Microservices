@@ -16,3 +16,5 @@ docker-compose-viz-mermaid-1.2.0.jar
 
 .idea/sonarlint
 
+filebeat/data
+
