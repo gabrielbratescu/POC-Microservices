@@ -53,7 +53,7 @@ services:
       context: service1
       dockerfile: Dockerfile
     ports:
-      - '8080'
+      - '18080:8080'
     networks:
       - micro-service-network
     environment:
